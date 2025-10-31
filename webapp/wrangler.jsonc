@@ -1,0 +1,13 @@
+{
+  "name": "kooperkai-aquatics",
+  "compatibility_date": "2024-01-01",
+  "pages_build_output_dir": "dist",
+  // Automatic product sync every 10 minutes
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+  // Environment variables (set these in Cloudflare dashboard)
+  "vars": {
+    "ENVIRONMENT": "production"
+  }
+}
