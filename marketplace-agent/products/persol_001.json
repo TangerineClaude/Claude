@@ -1,0 +1,64 @@
+{
+  "product_id": "persol_001",
+  "name": "Persol Tortoise Sunglasses - Handmade in Italy",
+  "category": "accessories",
+  "condition": "used_like_new",
+  "description": "Authentic Persol tortoise sunglasses, hand-made in Italy. These are the real deal - superior Italian craftsmanship and classic design. Lenses are in perfect condition with no scratches. Frames show minimal wear from gentle use. A timeless style that never goes out of fashion.",
+  "photos": [
+    "persol_main.jpg",
+    "persol_side.jpg",
+    "persol_detail.jpg"
+  ],
+  "pricing": {
+    "list_price": 145,
+    "minimum_price": 130,
+    "shipping_cost": 10,
+    "negotiation_flexibility": "medium"
+  },
+  "location": {
+    "city": "Akron",
+    "state": "OH",
+    "zip": "44310",
+    "pickup_enabled": true,
+    "shipping_enabled": true
+  },
+  "owner": {
+    "name": "Owner",
+    "email": "j25011111@protonmail.com",
+    "phone": "+12347042727",
+    "notify_on_offer_below": 120
+  },
+  "marketplaces": [
+    "facebook",
+    "craigslist",
+    "offerup"
+  ],
+  "agent_personality": "professional_friendly",
+  "custom_qa": [
+    {
+      "q": "do you have the case?",
+      "a": "No case included, price reflects this. I can include a generic protective case for $5 extra if you'd like."
+    },
+    {
+      "q": "are these real persol?",
+      "a": "100% authentic Persol, hand-made in Italy. You can verify by the markings on the frames and the quality of construction."
+    },
+    {
+      "q": "what's the model number?",
+      "a": "Let me get you the exact model number and get back to you shortly."
+    },
+    {
+      "q": "do they have prescription lenses?",
+      "a": "No, these are non-prescription sunglasses with standard Persol lenses."
+    }
+  ],
+  "highlights": [
+    "Authentic Persol hand-made in Italy",
+    "Perfect lens condition - no scratches",
+    "Classic tortoise design that never goes out of style",
+    "Great deal compared to $300+ retail price"
+  ],
+  "measurements": "Standard adult size - can provide exact measurements upon request",
+  "authenticity_proof": "100% authentic Persol. Marked 'Made in Italy' with Persol branding on frames. Can provide additional photos of markings/details.",
+  "condition_details": "Gently used, excellent condition. Lenses are perfect with no scratches. Frames show minimal wear. No case included."
+}
