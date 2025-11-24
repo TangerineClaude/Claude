@@ -1,0 +1,113 @@
+===============================================
+MARKETPLACE SALES AGENT - INSTALLATION GUIDE
+===============================================
+
+QUICK START (60 Seconds)
+------------------------
+
+1. Unzip this package
+2. Open terminal in the marketplace-agent/ directory
+3. Run: python deploy.py test --product persol_001
+4. Run: python deploy.py start --product persol_001
+
+That's it! Your autonomous sales agent is running.
+
+
+WHAT YOU HAVE
+-------------
+
+✅ Complete autonomous sales agent system
+✅ Pre-configured for Persol sunglasses ($145 list, $130 min)
+✅ Email, SMS, Voice channel support
+✅ Intelligent price negotiation
+✅ Scam detection and filtering
+✅ Multi-product support
+✅ Conversation logging and analytics
+
+
+NO DEPENDENCIES REQUIRED
+-------------------------
+
+The core system uses only Python standard library.
+
+Optional (for SMS/Voice):
+  pip install twilio
+
+
+BASIC COMMANDS
+--------------
+
+Test the agent:
+  python deploy.py test --product persol_001
+
+Start the agent:
+  python deploy.py start --product persol_001
+
+List all products:
+  python deploy.py list
+
+View statistics:
+  python deploy.py stats
+
+Add new product:
+  cp config/product_template.json products/newproduct.json
+  # Edit products/newproduct.json
+  python deploy.py add-product products/newproduct.json
+
+
+ENABLE EMAIL MONITORING
+------------------------
+
+1. Copy credentials template:
+   cp config/credentials.example.json config/credentials.json
+
+2. For Gmail:
+   - Enable 2-factor auth
+   - Generate app password: https://myaccount.google.com/apppasswords
+   - Add to config/credentials.json
+
+3. Restart agent
+
+
+ENABLE SMS (OPTIONAL)
+---------------------
+
+1. Sign up at https://www.twilio.com
+2. Get phone number (~$1/month)
+3. Add credentials to config/credentials.json
+4. Install: pip install twilio
+
+
+DOCUMENTATION
+-------------
+
+README.md - Complete feature documentation
+QUICKSTART.md - Quick deployment guide
+example_usage.py - Programmatic usage examples
+
+
+SUPPORT
+-------
+
+All logs saved to: logs/product_id/
+Configuration: config/
+Products: products/
+
+
+YOUR PERSOL SUNGLASSES
+----------------------
+
+Product ID: persol_001
+List Price: $145
+Minimum Price: $130
+Location: Akron, OH
+
+The agent will:
+- Accept offers ≥ $135 immediately
+- Counter-offer for $130-134
+- Escalate offers < $120 to you
+- Filter scams automatically
+
+
+HAPPY SELLING! 🚀
+
