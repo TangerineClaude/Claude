@@ -48,10 +48,10 @@ railway up
 ```
 
 **Then:**
-1. Set `OPENAI_API_KEY` in Railway dashboard
+1. Set `GEMINI_API_KEY` in Railway dashboard (get free key at https://makersuite.google.com/app/apikey)
 2. Visit your deployed URL
 3. Click "Install" to add to your device
-4. Create agents and missions - they run in the cloud!
+4. Create agents and missions - they run in the cloud FREE!
 
 ## Local Development
 
@@ -70,7 +70,8 @@ npm install
 2. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your database URL and OpenAI API key
+# Edit .env with your database URL and Gemini API key
+# Get free Gemini key: https://makersuite.google.com/app/apikey
 ```
 
 3. Set up the database:
@@ -202,10 +203,17 @@ All heavy lifting happens in the cloud. Your device just displays results.
 
 ## Cost Estimate (Monthly)
 
+**With Gemini (Recommended)**:
+- **Hosting**: $5-7 (Railway/Render)
+- **Database**: Included in hosting
+- **Gemini API**: FREE (generous free tier)
+- **Total**: ~$5-7/month for unlimited missions! 🎉
+
+**With OpenAI**:
 - **Hosting**: $5-7 (Railway/Render)
 - **Database**: Included in hosting
 - **OpenAI API**: ~$2-10 (depends on usage)
-- **Total**: ~$10-20/month for unlimited missions
+- **Total**: ~$10-20/month
 
 ## License
 

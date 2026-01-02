@@ -7,7 +7,7 @@ This app is ready to deploy as a PWA to any cloud platform. The agents run in th
 - **Frontend**: Progressive Web App (installable, offline-capable)
 - **Backend**: Node.js server running autonomous AI agents
 - **Database**: PostgreSQL (required)
-- **AI**: OpenAI API for intelligent task execution
+- **AI**: Google Gemini or OpenAI API for intelligent task execution
 
 ## Quick Deploy Options
 
@@ -31,7 +31,8 @@ railway add --plugin postgresql
 ```
 
 4. Set environment variables in Railway dashboard:
-   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `GEMINI_API_KEY`: Your Gemini API key (get free at https://makersuite.google.com/app/apikey)
+   - OR `OPENAI_API_KEY`: Your OpenAI API key
    - Database URL is automatically set
 
 5. Deploy:
@@ -54,7 +55,8 @@ Your app will be live at `https://your-app.up.railway.app`
    - PostgreSQL database
 
 5. Set environment variable:
-   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `GEMINI_API_KEY`: Your Gemini API key (recommended - free tier!)
+   - OR `OPENAI_API_KEY`: Your OpenAI API key
 
 6. Deploy!
 
@@ -103,12 +105,30 @@ docker run -p 3000:3000 \
 ```env
 # Required
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
+
+# AI Provider (choose one)
+GEMINI_API_KEY=your_gemini_key  # Recommended - free tier available!
+# OR
 OPENAI_API_KEY=sk-...
 
 # Optional
 PORT=3000
 NODE_ENV=production
 ```
+
+### Getting API Keys
+
+**Google Gemini (Recommended)**:
+- Visit: https://makersuite.google.com/app/apikey
+- Free tier: 60 requests/minute
+- Models: gemini-pro, gemini-1.5-pro, gemini-1.5-flash
+- Cost: FREE for moderate usage, then very cheap
+
+**OpenAI**:
+- Visit: https://platform.openai.com/api-keys
+- Requires credit card
+- GPT-4: ~$0.03 per 1K tokens
+- GPT-3.5: ~$0.002 per 1K tokens
 
 ## After Deployment
 
