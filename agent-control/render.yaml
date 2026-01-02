@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: agent-control
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agent-control-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+
+databases:
+  - name: agent-control-db
+    databaseName: agent_control
+    plan: starter
