@@ -1,0 +1,41 @@
+{
+  "name": "personal-agi",
+  "version": "1.0.0",
+  "description": "Personal AGI - Your digital extension with full memory and autonomous capabilities",
+  "main": "backend/server.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "NODE_ENV=development node backend/server.js",
+    "docker:build": "docker build -t personal-agi -f infrastructure/Dockerfile .",
+    "docker:up": "docker-compose -f infrastructure/docker-compose.yml up",
+    "docker:down": "docker-compose -f infrastructure/docker-compose.yml down",
+    "docker:logs": "docker-compose -f infrastructure/docker-compose.yml logs -f",
+    "db:setup": "psql $DATABASE_URL -f infrastructure/database-schema.sql",
+    "gcp:setup": "bash infrastructure/gcp-setup.sh",
+    "gcp:deploy": "gcloud builds submit --config=infrastructure/cloudbuild.yaml .",
+    "playwright:install": "npx playwright install chromium"
+  },
+  "keywords": ["agi", "ai", "assistant", "automation", "claude", "gemini"],
+  "author": "TangerineClaude",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "openai": "^6.15.0",
+    "pg": "^8.16.3",
+    "playwright": "^1.57.0",
+    "redis": "^5.10.0",
+    "twilio": "^5.11.1",
+    "uuid": "^13.0.0",
+    "winston": "^3.19.0"
+  }
+}
