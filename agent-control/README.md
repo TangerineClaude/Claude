@@ -4,6 +4,25 @@ AI Agent Swarm Control Center - A ruthless autonomous agent orchestration platfo
 
 **🌐 Deploy as PWA | 🤖 Agents work in the cloud | 📱 Install on any device**
 
+## 🆓 Deploy 100% FREE on Google Cloud
+
+**Total cost: $0/month** (using GCP free tier + free Gemini API)
+
+```bash
+# One command deployment
+chmod +x deploy-gcp.sh
+./deploy-gcp.sh
+```
+
+**What you get FREE:**
+- ✅ Cloud Run: 2M requests/month
+- ✅ PostgreSQL database
+- ✅ Gemini AI: 60 req/min
+- ✅ ~75,000 missions/month
+- ✅ PWA installable on all devices
+
+**See [DEPLOY-GCP.md](DEPLOY-GCP.md) for full guide**
+
 ## Features
 
 - **Progressive Web App**: Install on phone, tablet, or desktop - works offline
@@ -34,11 +53,16 @@ AI Agent Swarm Control Center - A ruthless autonomous agent orchestration platfo
 - OpenAI API
 - Playwright
 
-## Quick Start - Deploy to Cloud
+## Quick Start - Other Cloud Platforms
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed cloud deployment instructions.
+### Google Cloud (FREE - Recommended!)
+```bash
+chmod +x deploy-gcp.sh
+./deploy-gcp.sh
+```
+See [DEPLOY-GCP.md](DEPLOY-GCP.md) for details
 
-**Fastest deploy (Railway):**
+### Railway ($5-7/month)
 ```bash
 npm install -g @railway/cli
 railway login
@@ -48,10 +72,11 @@ railway up
 ```
 
 **Then:**
-1. Set `GEMINI_API_KEY` in Railway dashboard (get free key at https://makersuite.google.com/app/apikey)
+1. Set `GEMINI_API_KEY` in dashboard (get free key at https://makersuite.google.com/app/apikey)
 2. Visit your deployed URL
 3. Click "Install" to add to your device
-4. Create agents and missions - they run in the cloud FREE!
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for more options (Render, Fly.io, Vercel)
 
 ## Local Development
 
@@ -203,17 +228,20 @@ All heavy lifting happens in the cloud. Your device just displays results.
 
 ## Cost Estimate (Monthly)
 
-**With Gemini (Recommended)**:
+**Google Cloud Platform (Recommended)**:
+- **Hosting**: FREE (Cloud Run free tier)
+- **Database**: FREE (Cloud SQL f1-micro)
+- **Gemini API**: FREE (60 req/min)
+- **Total**: $0/month for ~75,000 missions! 🎉🎉🎉
+
+**Railway/Render**:
 - **Hosting**: $5-7 (Railway/Render)
 - **Database**: Included in hosting
 - **Gemini API**: FREE (generous free tier)
-- **Total**: ~$5-7/month for unlimited missions! 🎉
+- **Total**: ~$5-7/month
 
-**With OpenAI**:
-- **Hosting**: $5-7 (Railway/Render)
-- **Database**: Included in hosting
-- **OpenAI API**: ~$2-10 (depends on usage)
-- **Total**: ~$10-20/month
+**With OpenAI instead of Gemini**:
+- Add ~$2-10/month for API costs
 
 ## License
 
