@@ -1,0 +1,69 @@
+{
+  "product_id": "prod_001",
+  "name": "Product Name Here",
+  "category": "accessories",
+  "condition": "used_like_new",
+  "description": "Detailed product description here. Highlight key features and benefits.",
+  "photos": [
+    "photo1.jpg",
+    "photo2.jpg",
+    "photo3.jpg"
+  ],
+  "pricing": {
+    "list_price": 100,
+    "minimum_price": 85,
+    "shipping_cost": 10,
+    "negotiation_flexibility": "medium",
+    "_flexibility_options": "strict, medium, flexible"
+  },
+  "location": {
+    "city": "Your City",
+    "state": "ST",
+    "zip": "12345",
+    "pickup_enabled": true,
+    "shipping_enabled": true
+  },
+  "owner": {
+    "name": "Your Name",
+    "email": "owner@example.com",
+    "phone": "+12345678900",
+    "notify_on_offer_below": 80,
+    "_notify_options": "Email/SMS when offers below this amount"
+  },
+  "marketplaces": [
+    "facebook",
+    "craigslist",
+    "offerup"
+  ],
+  "agent_personality": "professional_friendly",
+  "_personality_options": [
+    "professional_friendly",
+    "casual_friendly",
+    "business_formal",
+    "enthusiastic"
+  ],
+  "custom_qa": [
+    {
+      "q": "does it come with the case?",
+      "a": "No case included, but I can include a generic protective case for $5 extra"
+    },
+    {
+      "q": "is there a warranty?",
+      "a": "Sold as-is, no warranty. Item is in excellent condition as described."
+    }
+  ],
+  "highlights": [
+    "Key selling point #1",
+    "Key selling point #2",
+    "Key selling point #3"
+  ],
+  "measurements": "Dimensions: L x W x H inches",
+  "authenticity_proof": "100% authentic. Original purchase receipt available upon request.",
+  "condition_details": "Gently used, no visible wear. Stored in smoke-free home.",
+  "_notes": {
+    "condition_options": "new, like_new, used_like_new, used_good, used_fair",
+    "category_options": "accessories, clothing, electronics, furniture, auto, general",
+    "pricing_tips": "Set minimum_price at your absolute lowest. Agent negotiates down to this.",
+    "custom_qa_tips": "Add common questions you expect. Agent will auto-respond using these."
+  }
+}
