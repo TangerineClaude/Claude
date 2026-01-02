@@ -2,6 +2,7 @@ import { db } from './db.js';
 import { missions, tasks, logs, agents } from '../shared/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateTasksForMission, executeTask } from './openai.js';
+import { notificationService } from './notifications.js';
 
 export class AgentEngine {
   private isRunning = false;
@@ -76,6 +77,9 @@ export class AgentEngine {
       message: `Mission started by uverlord.`,
     });
 
+    // Notify mission started
+    await notificationService.notifyMissionStarted(missionId, mission.title);
+
     // Generate tasks using AI
     try {
       await db.insert(logs).values({
@@ -102,6 +106,13 @@ export class AgentEngine {
         missionId,
         level: 'success',
         message: `Created ${taskDescriptions.length} tasks.`,
+      });
+
+      await notificationService.sendNotification({
+        title: 'Tasks Generated',
+        body: `Created ${taskDescriptions.length} steps for mission "${mission.title}"`,
+        url: `/missions/${missionId}`,
+        missionId,
       });
     } catch (error) {
       await db.insert(logs).values({
@@ -139,6 +150,11 @@ export class AgentEngine {
       const anyFailed = allTasks.some(t => t.status === 'failed');
 
       if (allCompleted) {
+        const [mission] = await db
+          .select()
+          .from(missions)
+          .where(eq(missions.id, missionId));
+
         await db
           .update(missions)
           .set({ status: 'completed', completedAt: new Date() })
@@ -149,7 +165,16 @@ export class AgentEngine {
           level: 'success',
           message: 'Mission completed successfully!',
         });
+
+        if (mission) {
+          await notificationService.notifyMissionCompleted(missionId, mission.title);
+        }
       } else if (anyFailed) {
+        const [mission] = await db
+          .select()
+          .from(missions)
+          .where(eq(missions.id, missionId));
+
         await db
           .update(missions)
           .set({ status: 'failed', completedAt: new Date() })
@@ -160,6 +185,10 @@ export class AgentEngine {
           level: 'error',
           message: 'Mission failed due to task errors.',
         });
+
+        if (mission) {
+          await notificationService.notifyMissionFailed(missionId, mission.title);
+        }
       }
 
       return;
@@ -231,6 +260,10 @@ export class AgentEngine {
         level: success ? 'success' : 'error',
         message: success ? `Step ${task.order} completed` : `Step ${task.order} failed`,
       });
+
+      if (success) {
+        await notificationService.notifyTaskCompleted(missionId, task.order, task.description);
+      }
     } catch (error) {
       await db
         .update(tasks)

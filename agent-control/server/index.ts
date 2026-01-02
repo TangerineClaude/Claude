@@ -6,6 +6,7 @@ import missionsRouter from './routes/missions.js';
 import tasksRouter from './routes/tasks.js';
 import logsRouter from './routes/logs.js';
 import { agentEngine } from './agent-engine.js';
+import { notificationService } from './notifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +25,19 @@ app.use('/api/logs', logsRouter);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'online' });
+});
+
+// Server-Sent Events for real-time notifications
+app.get('/api/notifications/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  // Send initial connection message
+  res.write('data: {"type":"connected","timestamp":"' + new Date().toISOString() + '"}\n\n');
+
+  // Add client to notification service
+  notificationService.addClient(res);
 });
 
 // Serve static files in production
