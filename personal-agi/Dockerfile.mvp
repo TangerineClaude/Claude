@@ -1,0 +1,25 @@
+# Minimal dependencies for MVP
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies we need
+RUN npm install --only=production \
+    express \
+    cors \
+    body-parser \
+    @google/generative-ai \
+    pg \
+    dotenv
+
+# Copy application
+COPY server-mvp.js ./
+COPY frontend/chat-interface/index-mvp.html ./frontend/chat-interface/index.html
+COPY .env ./
+
+EXPOSE 8080
+
+CMD ["node", "server-mvp.js"]
