@@ -1,9 +1,13 @@
 """
-Hermes Agent — Claude-powered communication and message orchestration agent.
+Hermes Agent — multi-provider AI orchestration agent.
+
+Supported providers (set HERMES_PROVIDER in .env):
+  anthropic   — Claude via Anthropic API (default, paid, best quality)
+  openrouter  — Any model via OpenRouter (free tier available)
 
 Workflow for each incoming message:
   1. MessageRouter classifies intent and selects the right sub-agent + reply channel
-  2. HermesAgent generates a response, calling tools if Claude requests them
+  2. HermesAgent generates a response, calling tools if the provider supports it
   3. ChannelManager delivers the reply
   4. ConversationMemory records the exchange for future context
 """
@@ -13,8 +17,6 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-
-import anthropic
 
 from .channels import ChannelManager, DeliveryResult
 from .memory import ConversationMemory
@@ -55,6 +57,14 @@ AGENT_PROMPTS: dict[str, str] = {
     ),
 }
 
+# Free models on OpenRouter with large context windows (64K+)
+OPENROUTER_FREE_MODELS = [
+    "meta-llama/llama-3.1-8b-instruct:free",   # 128K ctx — recommended default
+    "meta-llama/llama-3.2-3b-instruct:free",    # 131K ctx — very fast
+    "google/gemma-3-12b-it:free",               # 96K ctx  — strong reasoning
+    "microsoft/phi-3-mini-128k-instruct:free",  # 128K ctx — lightweight
+]
+
 
 @dataclass
 class HermesResponse:
@@ -70,24 +80,60 @@ class HermesAgent:
     """
     Core Hermes orchestration agent.
 
+    Set HERMES_PROVIDER=openrouter (+ OPENROUTER_API_KEY) for free models.
+    Set HERMES_PROVIDER=anthropic  (+ ANTHROPIC_API_KEY)  for Claude (default).
+
     The `message` parameter to `process()` accepts either:
       - str:  plain text
-      - list: Claude content blocks (for images, mixed text+image, etc.)
+      - list: Claude content blocks (for images — Anthropic provider only)
     """
 
     def __init__(self):
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise EnvironmentError("ANTHROPIC_API_KEY environment variable is required")
-
-        self.model = os.environ.get("HERMES_MODEL", "claude-sonnet-4-6")
+        self.provider = os.environ.get("HERMES_PROVIDER", "anthropic").lower()
         self.max_tokens = int(os.environ.get("HERMES_MAX_TOKENS", "2048"))
-
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.router = MessageRouter(client=self.client, model=self.model)
         self.channels = ChannelManager()
         self.memory = ConversationMemory()
         self.tools = ToolRegistry()
+
+        if self.provider == "openrouter":
+            self._init_openrouter()
+        else:
+            self._init_anthropic()
+
+    # ------------------------------------------------------------------
+    # Provider initialisation
+    # ------------------------------------------------------------------
+
+    def _init_anthropic(self) -> None:
+        import anthropic as _anthropic
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "ANTHROPIC_API_KEY is required when HERMES_PROVIDER=anthropic (the default).\n"
+                "Either add the key to .env, or switch to the free OpenRouter provider:\n"
+                "  HERMES_PROVIDER=openrouter\n"
+                "  OPENROUTER_API_KEY=<your key from openrouter.ai>"
+            )
+        self._anthropic = _anthropic.Anthropic(api_key=api_key)
+        self.model = os.environ.get("HERMES_MODEL", "claude-sonnet-4-6")
+        self.router: MessageRouter | None = MessageRouter(client=self._anthropic, model=self.model)
+        logger.info("Provider: Anthropic — model=%s", self.model)
+
+    def _init_openrouter(self) -> None:
+        import openai as _openai
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "OPENROUTER_API_KEY is required when HERMES_PROVIDER=openrouter.\n"
+                "Sign up free at https://openrouter.ai, then add the key to .env."
+            )
+        self._openrouter = _openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
+        self.model = os.environ.get("OPENROUTER_MODEL", OPENROUTER_FREE_MODELS[0])
+        self.router = None  # routing uses simple defaults with OpenRouter
+        logger.info("Provider: OpenRouter — model=%s", self.model)
 
     # ------------------------------------------------------------------
     # Public API
@@ -104,7 +150,7 @@ class HermesAgent:
         Process an incoming message end-to-end.
 
         Args:
-            message:          Text string or a list of Claude content blocks.
+            message:          Text string or Claude content blocks (images — Anthropic only).
             session_id:       Conversation session identifier. Auto-generated if omitted.
             reply_to:         Recipient address for outbound delivery.
             channel_override: Force a specific outbound channel.
@@ -115,7 +161,10 @@ class HermesAgent:
         text_for_routing = message if isinstance(message, str) else _extract_text(message)
         history = self.memory.get_history(session_id)
 
-        route = self.router.route(text_for_routing, context=history)
+        if self.router:
+            route = self.router.route(text_for_routing, context=history)
+        else:
+            route = RouteDecision({})  # neutral defaults for OpenRouter
         logger.info("Routed: %r → session=%s", route, session_id)
 
         system_prompt = AGENT_PROMPTS.get(route.agent, AGENT_PROMPTS["general"])
@@ -157,7 +206,7 @@ class HermesAgent:
         return self.memory.list_sessions()
 
     # ------------------------------------------------------------------
-    # Internal: generation with tool-use loop
+    # Internal: generation (dispatches by provider)
     # ------------------------------------------------------------------
 
     def _generate(
@@ -166,12 +215,21 @@ class HermesAgent:
         system_prompt: str,
         history: list[dict],
     ) -> tuple[str, int]:
+        if self.provider == "openrouter":
+            return self._generate_openrouter(user_message, system_prompt, history)
+        return self._generate_anthropic(user_message, system_prompt, history)
+
+    def _generate_anthropic(
+        self,
+        user_message: str | list,
+        system_prompt: str,
+        history: list[dict],
+    ) -> tuple[str, int]:
         messages = list(history)
         messages.append({"role": "user", "content": user_message})
 
-        # Cache the system prompt — saves cost on repeated calls with the same prompt
+        # Ephemeral cache on the system prompt — reduces cost on repeated calls
         system = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
-
         claude_tools = self.tools.get_claude_tools()
         total_tokens = 0
 
@@ -185,14 +243,11 @@ class HermesAgent:
             if claude_tools:
                 kwargs["tools"] = claude_tools
 
-            response = self.client.messages.create(**kwargs)
+            response = self._anthropic.messages.create(**kwargs)
             total_tokens += response.usage.input_tokens + response.usage.output_tokens
 
             if response.stop_reason == "tool_use":
-                # Append assistant turn (may include both text and tool_use blocks)
                 messages.append({"role": "assistant", "content": response.content})
-
-                # Execute every tool Claude requested, collect results
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
@@ -202,17 +257,35 @@ class HermesAgent:
                             "tool_use_id": block.id,
                             "content": result,
                         })
-
                 messages.append({"role": "user", "content": tool_results})
-                # Loop: Claude will now read the tool results and continue
-
             else:
-                # end_turn — extract the final text response
                 text = next(
-                    (block.text for block in response.content if hasattr(block, "text")),
-                    "",
+                    (block.text for block in response.content if hasattr(block, "text")), ""
                 )
                 return text, total_tokens
+
+    def _generate_openrouter(
+        self,
+        user_message: str | list,
+        system_prompt: str,
+        history: list[dict],
+    ) -> tuple[str, int]:
+        # OpenRouter uses the OpenAI chat-completions format
+        messages: list[dict] = [{"role": "system", "content": system_prompt}]
+        messages.extend(history)
+
+        # Flatten image content blocks to text for non-Anthropic providers
+        content = user_message if isinstance(user_message, str) else _extract_text(user_message)
+        messages.append({"role": "user", "content": content})
+
+        response = self._openrouter.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            max_tokens=self.max_tokens,
+        )
+        text = response.choices[0].message.content or ""
+        tokens = response.usage.total_tokens if response.usage else 0
+        return text, tokens
 
 
 # ---------------------------------------------------------------------------
