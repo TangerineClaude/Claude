@@ -1,9 +1,11 @@
 """
 Hermes Agent — Claude-powered communication and message orchestration agent.
 
-Named after the Greek messenger god, Hermes receives messages from any channel,
-intelligently routes them to the right sub-agent, generates a response with Claude,
-and delivers the reply through the appropriate outbound channel.
+Workflow for each incoming message:
+  1. MessageRouter classifies intent and selects the right sub-agent + reply channel
+  2. HermesAgent generates a response, calling tools if Claude requests them
+  3. ChannelManager delivers the reply
+  4. ConversationMemory records the exchange for future context
 """
 
 import logging
@@ -17,10 +19,10 @@ import anthropic
 from .channels import ChannelManager, DeliveryResult
 from .memory import ConversationMemory
 from .router import MessageRouter, RouteDecision
+from .tools import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-# System prompts keyed by agent specialisation
 AGENT_PROMPTS: dict[str, str] = {
     "general": (
         "You are Hermes, a helpful and concise AI assistant. "
@@ -28,27 +30,28 @@ AGENT_PROMPTS: dict[str, str] = {
     ),
     "research": (
         "You are Hermes in research mode. Provide thorough, well-sourced analysis. "
-        "Structure complex answers with headers and bullet points."
+        "Structure complex answers with headers and bullet points. "
+        "Use the web_search tool to find current information when relevant."
     ),
     "code": (
         "You are Hermes in code mode. Write clean, production-ready code with minimal comments. "
-        "Prefer working solutions over explanations unless asked."
+        "Prefer working solutions over lengthy explanations unless asked."
     ),
     "summarize": (
-        "You are Hermes in summarization mode. Condense the provided content into the key points. "
-        "Use bullet points. Be ruthlessly concise."
+        "You are Hermes in summarization mode. Condense content into key points using bullet points. "
+        "Be ruthlessly concise."
     ),
     "translate": (
         "You are Hermes in translation mode. Translate accurately, preserving tone and nuance. "
-        "If the target language is ambiguous, ask before translating."
+        "Ask for the target language if ambiguous."
     ),
     "schedule": (
-        "You are Hermes in scheduling mode. Help parse, create, and manage calendar events and reminders. "
+        "You are Hermes in scheduling mode. Help parse, create, and manage calendar events. "
         "Output structured data when creating events."
     ),
     "alert": (
         "You are Hermes in alert mode. Evaluate incoming signals for urgency and actionability. "
-        "Flag anything that requires immediate human attention clearly."
+        "Flag anything requiring immediate human attention clearly."
     ),
 }
 
@@ -67,11 +70,9 @@ class HermesAgent:
     """
     Core Hermes orchestration agent.
 
-    Workflow for each incoming message:
-      1. Router classifies intent, selects sub-agent and reply channel
-      2. Claude generates a response using the appropriate system prompt
-      3. ChannelManager delivers the reply to the outbound channel
-      4. ConversationMemory records the exchange for context continuity
+    The `message` parameter to `process()` accepts either:
+      - str:  plain text
+      - list: Claude content blocks (for images, mixed text+image, etc.)
     """
 
     def __init__(self):
@@ -86,6 +87,7 @@ class HermesAgent:
         self.router = MessageRouter(client=self.client, model=self.model)
         self.channels = ChannelManager()
         self.memory = ConversationMemory()
+        self.tools = ToolRegistry()
 
     # ------------------------------------------------------------------
     # Public API
@@ -93,7 +95,7 @@ class HermesAgent:
 
     def process(
         self,
-        message: str,
+        message: str | list,
         session_id: str | None = None,
         reply_to: str | None = None,
         channel_override: str | None = None,
@@ -102,33 +104,26 @@ class HermesAgent:
         Process an incoming message end-to-end.
 
         Args:
-            message:          The user's message text.
+            message:          Text string or a list of Claude content blocks.
             session_id:       Conversation session identifier. Auto-generated if omitted.
-            reply_to:         Recipient address for outbound delivery (email addr, webhook URL, etc.)
-            channel_override: Force a specific outbound channel instead of the router's choice.
-
-        Returns:
-            HermesResponse with the generated reply, routing decision, and delivery result.
+            reply_to:         Recipient address for outbound delivery.
+            channel_override: Force a specific outbound channel.
         """
         session_id = session_id or str(uuid.uuid4())
         t0 = time.perf_counter()
 
-        # 1. Retrieve conversation context
+        text_for_routing = message if isinstance(message, str) else _extract_text(message)
         history = self.memory.get_history(session_id)
 
-        # 2. Route the message
-        route = self.router.route(message, context=history)
+        route = self.router.route(text_for_routing, context=history)
         logger.info("Routed: %r → session=%s", route, session_id)
 
-        # 3. Generate a response with Claude
         system_prompt = AGENT_PROMPTS.get(route.agent, AGENT_PROMPTS["general"])
         reply_text, tokens_used = self._generate(message, system_prompt, history)
 
-        # 4. Persist to memory
-        self.memory.add(session_id, role="user", content=message, channel=route.channel)
+        self.memory.add(session_id, role="user", content=text_for_routing, channel=route.channel)
         self.memory.add(session_id, role="assistant", content=reply_text, channel=route.channel)
 
-        # 5. Deliver through appropriate channel
         outbound_channel = channel_override or route.channel
         delivery = self.channels.send(
             channel_name=outbound_channel,
@@ -162,19 +157,70 @@ class HermesAgent:
         return self.memory.list_sessions()
 
     # ------------------------------------------------------------------
-    # Internal helpers
+    # Internal: generation with tool-use loop
     # ------------------------------------------------------------------
 
-    def _generate(self, user_message: str, system_prompt: str, history: list[dict]) -> tuple[str, int]:
-        messages = list(history)  # shallow copy
+    def _generate(
+        self,
+        user_message: str | list,
+        system_prompt: str,
+        history: list[dict],
+    ) -> tuple[str, int]:
+        messages = list(history)
         messages.append({"role": "user", "content": user_message})
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=system_prompt,
-            messages=messages,
-        )
-        text = response.content[0].text
-        tokens = response.usage.input_tokens + response.usage.output_tokens
-        return text, tokens
+        # Cache the system prompt — saves cost on repeated calls with the same prompt
+        system = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+        claude_tools = self.tools.get_claude_tools()
+        total_tokens = 0
+
+        while True:
+            kwargs: dict = {
+                "model": self.model,
+                "max_tokens": self.max_tokens,
+                "system": system,
+                "messages": messages,
+            }
+            if claude_tools:
+                kwargs["tools"] = claude_tools
+
+            response = self.client.messages.create(**kwargs)
+            total_tokens += response.usage.input_tokens + response.usage.output_tokens
+
+            if response.stop_reason == "tool_use":
+                # Append assistant turn (may include both text and tool_use blocks)
+                messages.append({"role": "assistant", "content": response.content})
+
+                # Execute every tool Claude requested, collect results
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = self.tools.execute(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result,
+                        })
+
+                messages.append({"role": "user", "content": tool_results})
+                # Loop: Claude will now read the tool results and continue
+
+            else:
+                # end_turn — extract the final text response
+                text = next(
+                    (block.text for block in response.content if hasattr(block, "text")),
+                    "",
+                )
+                return text, total_tokens
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _extract_text(content_blocks: list) -> str:
+    """Pull plain text out of a Claude content-block list."""
+    return " ".join(
+        b["text"] for b in content_blocks if isinstance(b, dict) and b.get("type") == "text"
+    )

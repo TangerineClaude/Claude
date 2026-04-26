@@ -1,0 +1,22 @@
+[Unit]
+Description=Hermes Telegram Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Replace YOUR_USERNAME with the output of: whoami
+User=YOUR_USERNAME
+# Replace with the absolute path to your hermes-agent directory
+WorkingDirectory=/home/YOUR_USERNAME/hermes-agent
+# Replace with the absolute path to your venv python
+ExecStart=/home/YOUR_USERNAME/hermes-agent/venv/bin/python telegram_gateway.py
+# Load all settings from .env
+EnvironmentFile=/home/YOUR_USERNAME/hermes-agent/.env
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
