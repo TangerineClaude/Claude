@@ -57,8 +57,8 @@ ALLOWED_USERS: set[int] = {
 
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
 
-# Initialised once at startup
-agent: HermesAgent = HermesAgent()
+# Initialised in main() so startup errors are clearly visible
+agent: HermesAgent | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +70,10 @@ def _is_allowed(update: Update) -> bool:
         logger.warning("TELEGRAM_ALLOWED_USERS is empty — bot is open to everyone!")
         return True
     return (update.effective_user is not None) and (update.effective_user.id in ALLOWED_USERS)
+
+
+def _agent_ready() -> bool:
+    return agent is not None
 
 
 def _session_id(update: Update) -> str:
@@ -179,6 +183,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not _is_allowed(update):
         await update.message.reply_text("Access denied.")
         return
+    if not _agent_ready():
+        await update.message.reply_text("Agent not ready — check server logs.")
+        return
 
     await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
 
@@ -279,16 +286,41 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    global agent
+
+    # ── Pre-flight checks ────────────────────────────────────────────────────
+    errors = []
     if not BOT_TOKEN:
-        raise EnvironmentError(
-            "TELEGRAM_BOT_TOKEN is not set.\n"
-            "Create a bot via @BotFather on Telegram, copy the token, and add it to .env"
-        )
+        errors.append("TELEGRAM_BOT_TOKEN is missing — get it from @BotFather and add to .env")
+
+    provider = os.environ.get("HERMES_PROVIDER", "anthropic").lower()
+    if provider == "gemini" and not os.environ.get("GEMINI_API_KEY"):
+        errors.append("GEMINI_API_KEY is missing — get a free key from aistudio.google.com")
+    elif provider == "openrouter" and not os.environ.get("OPENROUTER_API_KEY"):
+        errors.append("OPENROUTER_API_KEY is missing — get it from openrouter.ai")
+    elif provider == "anthropic" and not os.environ.get("ANTHROPIC_API_KEY"):
+        errors.append("ANTHROPIC_API_KEY is missing — get it from console.anthropic.com")
+
+    if errors:
+        print("\n❌ Cannot start — fix these issues in your .env file:\n")
+        for e in errors:
+            print(f"  • {e}")
+        print()
+        raise SystemExit(1)
+
     if not ALLOWED_USERS:
         logger.warning(
             "TELEGRAM_ALLOWED_USERS is empty — the bot will respond to anyone. "
             "Set it to your Telegram user ID to make this private."
         )
+
+    # ── Initialise agent ─────────────────────────────────────────────────────
+    try:
+        agent = HermesAgent()
+        logger.info("Agent ready — provider=%s model=%s", agent.provider, agent.model)
+    except Exception as exc:
+        print(f"\n❌ Failed to initialise agent: {exc}\n")
+        raise SystemExit(1)
 
     app = Application.builder().token(BOT_TOKEN).build()
 
