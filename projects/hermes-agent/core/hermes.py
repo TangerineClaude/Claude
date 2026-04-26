@@ -4,6 +4,7 @@ Hermes Agent — multi-provider AI orchestration agent.
 Supported providers (set HERMES_PROVIDER in .env):
   anthropic   — Claude via Anthropic API (default, paid, best quality)
   openrouter  — Any model via OpenRouter (free tier available)
+  gemini      — Google Gemini via AI Studio API (generous free tier)
 
 Workflow for each incoming message:
   1. MessageRouter classifies intent and selects the right sub-agent + reply channel
@@ -80,8 +81,9 @@ class HermesAgent:
     """
     Core Hermes orchestration agent.
 
-    Set HERMES_PROVIDER=openrouter (+ OPENROUTER_API_KEY) for free models.
     Set HERMES_PROVIDER=anthropic  (+ ANTHROPIC_API_KEY)  for Claude (default).
+    Set HERMES_PROVIDER=openrouter (+ OPENROUTER_API_KEY) for free OpenRouter models.
+    Set HERMES_PROVIDER=gemini     (+ GEMINI_API_KEY)     for Google Gemini.
 
     The `message` parameter to `process()` accepts either:
       - str:  plain text
@@ -97,6 +99,8 @@ class HermesAgent:
 
         if self.provider == "openrouter":
             self._init_openrouter()
+        elif self.provider == "gemini":
+            self._init_gemini()
         else:
             self._init_anthropic()
 
@@ -118,6 +122,20 @@ class HermesAgent:
         self.model = os.environ.get("HERMES_MODEL", "claude-sonnet-4-6")
         self.router: MessageRouter | None = MessageRouter(client=self._anthropic, model=self.model)
         logger.info("Provider: Anthropic — model=%s", self.model)
+
+    def _init_gemini(self) -> None:
+        import google.generativeai as genai
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "GEMINI_API_KEY is required when HERMES_PROVIDER=gemini.\n"
+                "Get a free key at https://aistudio.google.com → Get API key."
+            )
+        genai.configure(api_key=api_key)
+        self._genai = genai
+        self.model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+        self.router = None
+        logger.info("Provider: Gemini — model=%s", self.model)
 
     def _init_openrouter(self) -> None:
         import openai as _openai
@@ -215,6 +233,8 @@ class HermesAgent:
         system_prompt: str,
         history: list[dict],
     ) -> tuple[str, int]:
+        if self.provider == "gemini":
+            return self._generate_gemini(user_message, system_prompt, history)
         if self.provider == "openrouter":
             return self._generate_openrouter(user_message, system_prompt, history)
         return self._generate_anthropic(user_message, system_prompt, history)
@@ -263,6 +283,34 @@ class HermesAgent:
                     (block.text for block in response.content if hasattr(block, "text")), ""
                 )
                 return text, total_tokens
+
+    def _generate_gemini(
+        self,
+        user_message: str | list,
+        system_prompt: str,
+        history: list[dict],
+    ) -> tuple[str, int]:
+        # Gemini uses "model" instead of "assistant" for the AI role
+        gemini_history = [
+            {
+                "role": "model" if msg["role"] == "assistant" else "user",
+                "parts": [msg["content"]],
+            }
+            for msg in history
+        ]
+        content = user_message if isinstance(user_message, str) else _extract_text(user_message)
+        model = self._genai.GenerativeModel(
+            model_name=self.model,
+            system_instruction=system_prompt,
+        )
+        chat = model.start_chat(history=gemini_history)
+        response = chat.send_message(content)
+        text = response.text
+        tokens = (
+            response.usage_metadata.total_token_count
+            if response.usage_metadata else 0
+        )
+        return text, tokens
 
     def _generate_openrouter(
         self,
